@@ -4,8 +4,9 @@ venv
 
 # My files
 *.png
-*.txt
+notes.txt
 *.code-workspace
+frontend/node_modules/
 
 # OS generated files #
 ######################
