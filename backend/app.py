@@ -8,6 +8,21 @@ from models import setup_db, Question, Category
 
 QUESTIONS_PER_PAGE = 10
 
+# Helper Functions
+###########################
+
+# Pagination
+def paginate(request, selection):
+    page = request.args.get('page', 1, type=int)    # 1 is the default if not given
+    start = (page - 1) * QUESTIONS_PER_PAGE
+    end = start + QUESTIONS_PER_PAGE
+
+    # It's more efficient to do the slicing on selection rather than further post-processing
+    # by slicing the questions list next (as given in class example code)
+    questions = [ question.format() for question in selection[start:end] ]
+    return questions
+
+
 def create_app(test_config=None):
     # create and configure the app
     app = Flask(__name__)
@@ -18,6 +33,7 @@ def create_app(test_config=None):
     # a little more secure by being less permissive than the broadest strokes (CORS(app))
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
+
     # Set Access-Control-Allow headers after each request
     # (after_request decorator runs after the route handler for a request, but 
     # keep in mind it MODIFIES the response.
@@ -26,30 +42,55 @@ def create_app(test_config=None):
         response.headers.add('Access-Control-Allow-Methods', 'GET,PATCH,POST,DELETE,OPTIONS')
         return response
 
+    # API-digestible error handlers
+    # These override the default HTML response when we call abort
+    ###############################
+    @app.errorhandler(400)
+    def bad_request(error):
+        return jsonify({
+            "success": False,
+            "error": 400,
+            "message": "Bad Request"
+        })
 
-    # Helper function for pagination
-    def paginate(request, selection):
-        page = request.args.get('page', 1, type=int)    # 1 is the default if not given
-        start = (page - 1) * QUESTIONS_PER_PAGE
-        end = start + QUESTIONS_PER_PAGE
+    @app.errorhandler(404)
+    def not_found(error):
+        return jsonify({
+            "success": False,
+            "error": 404,
+            "message": "Not found"
+        })
 
-        # It's more efficient to do the slicing on selection rather than further post-processing
-        # by slicing the questions list next (as given in class example code)
-        questions = [ question.format() for question in selection[start:end] ]
-        return questions
+    @app.errorhandler(422)
+    def unprocessable_entity(error):
+        return jsonify({
+            "success": False,
+            "error": 422,
+            "message": "Unprocessable Entity"
+        })
+
+    @app.errorhandler(500)
+    def server_error(error):
+        return jsonify({
+            "success": False,
+            "error": 500,
+            "message": "Internal Server Error"
+        })
 
 
     @app.route('/api/categories')
     def get_categories():
-        categories = Category.query.all()
-        cat_dict = {cat.id:cat.type for cat in categories}
+        try:
+            # Simple request, should return with no issues, but catch failure case
+            categories = Category.query.all()
+            cat_dict = {cat.id:cat.type for cat in categories}
         
-        #FIXME: handle errors
-        
-        return jsonify({
-            "success": True,
-            "categories": cat_dict
-        })
+            return jsonify({
+                "success": True,
+                "categories": cat_dict
+            })
+        except:
+            abort(500)  # Internal server error if can't do this
 
 
     @app.route('/api/questions')
@@ -63,7 +104,9 @@ def create_app(test_config=None):
         categories = Category.query.all()
         cat_dict = {cat.id:cat.type for cat in categories}
         
-        # FIXME: handle errors
+        if len(q_list) == 0:
+            # Requested a page past what exists
+            abort(404)
 
         return jsonify({
             'success': True,
@@ -74,13 +117,25 @@ def create_app(test_config=None):
         })
 
 
-    '''
-    @TODO: 
-    Create an endpoint to DELETE question using a question ID. 
+    @app.route('/api/questions/<int:q_id>', methods=['DELETE'])
+    def delete_question(q_id):
+        question = Question.query.get(q_id)
 
-    TEST: When you click the trash icon next to a question, the question will be removed.
-    This removal will persist in the database and when you refresh the page. 
-    '''
+        if not question:
+            # Question id doesn't exist
+            abort(404)
+        else:
+            # Exists, try to delete it
+            try:
+                question.delete()   # Has own method
+
+                return jsonify({
+                    'success': True,
+                    'deleted': q_id
+                })
+            except:
+                abort(422)  # Understood the request and it was formatted properly, but was unable to process request
+                
 
     '''
     @TODO: 
