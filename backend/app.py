@@ -136,49 +136,76 @@ def create_app(test_config=None):
             except:
                 abort(422)  # Understood the request and it was formatted properly, but was unable to process request
                 
-
+    
     @app.route('/api/questions', methods=['POST'])
     def add_question():
+        '''This endpoint not only POSTs new questions, but is also how the search terms
+        on questions works, so we need to handle both cases here'''
         form_data = request.json
 
-        # Check for errors with the submission
-        if (form_data['question'].strip() == "") or (form_data['answer'].strip() == ""):
-            # Don't populate blanks, return a bad request error
-            abort(400)
+        if "searchTerm" in form_data:
+            search_term = form_data['searchTerm'].strip()
 
-        try:
-            new_question = Question(question=form_data['question'].strip(), answer=form_data['answer'].strip(), \
-                category=form_data['category'], difficulty=form_data['difficulty'])
-            new_question.insert()
-        except:
-            # Issue creating new question?  422 means understood the request but couldn't do it
-            abort(422)
+            # Use filter, not filter_by when doing LIKE search (i=insensitive to case)
+            questions = Question.query.filter(Question.question.ilike(f'%{search_term}%')).all()   # Wildcards search before and after
+            
+            # Still good idea to paginate since search could return a ton (entire list if you search "", 
+            # which project doesn't exclude).  However Search Questions view in Frontend doesn't already include
+            # support for pagination, so this time I won't do it (or you can't see all valid search results).
+            #q_list = paginate(request, questions)
+            q_list = [q.format() for q in questions]
+
+            return jsonify({
+                "success": True,
+                "questions": q_list
+            })
+        
+        else:
+            # Otherwise, adding a new question through form
+
+            # Check for errors with the submission
+            if (form_data['question'].strip() == "") or (form_data['answer'].strip() == ""):
+                # Don't populate blanks, return a bad request error
+                abort(400)
+
+            try:
+                new_question = Question(question=form_data['question'].strip(), answer=form_data['answer'].strip(), \
+                    category=form_data['category'], difficulty=form_data['difficulty'])
+                new_question.insert()
+            except:
+                # Issue creating new question?  422 means understood the request but couldn't do it
+                abort(422)
+
+            return jsonify({
+                "success": True,
+                "added": new_question.id
+            })
+
+
+    @app.route('/api/categories/<int:cat_id>/questions')
+    def get_category_questions(cat_id):
+        '''GET all the questions based on a particular category'''
+        questions = Question.query.filter_by(category=str(cat_id)).all()
+
+        q_list = paginate(request, questions)
+
+        if len(q_list) == 0:
+            # Requested a page past what exists
+            abort(404)
 
         return jsonify({
-            "success": True,
-            "added": new_question.id
+            'success': True,
+            'questions': q_list,
+            'total_questions': len(questions),
+            'categories': Category.query.get(cat_id).format(),
+            'current_category': cat_id
         })
 
 
-    '''
-    @TODO: 
-    Create a POST endpoint to get questions based on a search term. 
-    It should return any questions for whom the search term 
-    is a substring of the question. 
 
-    TEST: Search by any phrase. The questions list will update to include 
-    only question that include that string within their question. 
-    Try using the word "title" to start. 
-    '''
 
-    '''
-    @TODO: 
-    Create a GET endpoint to get questions based on category. 
 
-    TEST: In the "List" tab / main screen, clicking on one of the 
-    categories in the left column will cause only questions of that 
-    category to be shown. 
-    '''
+
     '''
     @TODO: 
     Create a POST endpoint to get questions to play the quiz. 
