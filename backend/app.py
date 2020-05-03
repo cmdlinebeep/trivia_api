@@ -137,16 +137,28 @@ def create_app(test_config=None):
                 abort(422)  # Understood the request and it was formatted properly, but was unable to process request
                 
 
-    '''
-    @TODO: 
-    Create an endpoint to POST a new question, 
-    which will require the question and answer text, 
-    category, and difficulty score.
+    @app.route('/api/questions', methods=['POST'])
+    def add_question():
+        form_data = request.json
 
-    TEST: When you submit a question on the "Add" tab, 
-    the form will clear and the question will appear at the end of the last page
-    of the questions list in the "List" tab.  
-    '''
+        # Check for errors with the submission
+        if (form_data['question'].strip() == "") or (form_data['answer'].strip() == ""):
+            # Don't populate blanks, return a bad request error
+            abort(400)
+
+        try:
+            new_question = Question(question=form_data['question'].strip(), answer=form_data['answer'].strip(), \
+                category=form_data['category'], difficulty=form_data['difficulty'])
+            new_question.insert()
+        except:
+            # Issue creating new question?  422 means understood the request but couldn't do it
+            abort(422)
+
+        return jsonify({
+            "success": True,
+            "added": new_question.id
+        })
+
 
     '''
     @TODO: 

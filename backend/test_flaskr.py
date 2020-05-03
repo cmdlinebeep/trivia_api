@@ -25,6 +25,14 @@ class TriviaTestCase(unittest.TestCase):
             # create all tables
             self.db.create_all()
 
+        # new question for testing
+        self.new_question = {
+            "question": "How many points is a touchdown worth?",
+            "answer": "6",
+            "category": "6",
+            "difficulty": 1
+            }
+
     def tearDown(self):
         """Executed after reach test"""
         pass
@@ -86,8 +94,8 @@ class TriviaTestCase(unittest.TestCase):
         """Create a new question, then test deleting it"""
         
         # Create a test question to delete
-        new_question = Question(question='A resurgent nuclear technology called LFTR, thought by many capable of \
-            meeting all global energy needs, is based on what element?', answer="Thorium", category="1", difficulty=4)
+        new_question = Question(question=self.new_question['question'], answer=self.new_question['answer'], \
+            category=self.new_question['category'], difficulty=self.new_question['difficulty'])
         new_question.insert()
         nq_id = new_question.id
 
@@ -108,6 +116,51 @@ class TriviaTestCase(unittest.TestCase):
         data = json.loads(res.data)
 
         self.assertEqual(data['error'], 404)
+
+    def test_post_new_question(self):
+        """POST a new question and make sure it's in there on the last page"""
+        # Count first and before doing any changes
+        all_questions = Question.query.all()
+        orig_num_questions = len(all_questions)
+        self.assertEqual(orig_num_questions, 19)    # 19 originally in test DB
+
+        # POST a new question using API endpoint
+        res = self.client().post('/api/questions', json=self.new_question)
+        data = json.loads(res.data)
+        nq_id = data['added']
+
+        self.assertEqual(data['success'], True)
+        
+        # The API returns the primary key id of the new question, but this changes with 
+        # each test run as the DB keeps incrementing the sequence, so don't have a constant
+        # value to check it against.
+        # self.assertEqual(data['added'], )
+        
+        # Count that a new question was added, should have 20 after add
+        all_questions = Question.query.all()
+        self.assertEqual(len(all_questions), orig_num_questions + 1)    # 19 originally in test DB
+
+        # Delete question from database again with another client request.  
+        # API returns the primary key
+        res = self.client().delete(f'/api/questions/{nq_id}')
+        data = json.loads(res.data)
+
+        self.assertEqual(data['success'], True)
+        self.assertEqual(data['deleted'], nq_id)
+
+    def test_post_empty_question(self):
+        """POST a new question without a question or answer, should fail 400"""
+        empty_question = {
+            "question": "          ",
+            "answer": "           ",
+            "category": "6",
+            "difficulty": 1
+        }
+        res = self.client().post('/api/questions', json=empty_question)
+        data = json.loads(res.data)
+
+        self.assertEqual(data['success'], False)
+        self.assertEqual(data['error'], 400)
 
 
 # Make the tests conveniently executable
