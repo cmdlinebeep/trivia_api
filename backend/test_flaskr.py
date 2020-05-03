@@ -3,7 +3,7 @@ import unittest
 import json
 from flask_sqlalchemy import SQLAlchemy
 
-from app import create_app
+from app import create_app, QUESTIONS_PER_PAGE
 from models import setup_db, Question, Category
 
 
@@ -38,11 +38,40 @@ class TriviaTestCase(unittest.TestCase):
         res = self.client().get('/api/categories')
         data = json.loads(res.data)
 
-        print(res)
-        print(data)
+        # print(res)
+        # print(data)
         self.assertEqual(res.status_code, 200)
         self.assertEqual(data['success'], True)
         self.assertEqual(len(data['categories']), 6)
+
+    def test_get_all_questions(self):
+        """Gets all questions, including paginations (every 10 questions).  This endpoint should 
+        return a list of questions, number of total questions, current category, categories."""
+        res = self.client().get('/api/questions')
+        data = json.loads(res.data)
+
+        # This endpoint should default to page one, which should have id 5 first
+        # and total questions of 19
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(data['success'], True)
+        self.assertEqual(len(data['categories']), 6)
+        self.assertEqual(data['total_questions'], 19)
+        self.assertEqual(len(data['questions']), QUESTIONS_PER_PAGE)
+        self.assertEqual(data['questions'][0]['id'], 5)
+
+    def test_pagination(self):
+        """Tests the pagination by getting page 2 and looking for known features"""
+        res = self.client().get('/api/questions?page=2')
+        data = json.loads(res.data)
+
+        # This endpoint should default to page one, which should have id 5 first
+        # and total questions of 19
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(data['success'], True)
+        self.assertEqual(len(data['categories']), 6)
+        self.assertEqual(data['total_questions'], 19)
+        self.assertEqual(len(data['questions']), 9)     # Should be 9 left
+        self.assertEqual(data['questions'][0]['id'], 15)
 
 
 # Make the tests conveniently executable

@@ -27,37 +27,52 @@ def create_app(test_config=None):
         return response
 
 
-    '''
-    @TODO: 
-    Create an endpoint to handle GET requests 
-    for all available categories.
-    '''
+    # Helper function for pagination
+    def paginate(request, selection):
+        page = request.args.get('page', 1, type=int)    # 1 is the default if not given
+        start = (page - 1) * QUESTIONS_PER_PAGE
+        end = start + QUESTIONS_PER_PAGE
+
+        # It's more efficient to do the slicing on selection rather than further post-processing
+        # by slicing the questions list next (as given in class example code)
+        questions = [ question.format() for question in selection[start:end] ]
+        return questions
+
+
     @app.route('/api/categories')
     def get_categories():
         categories = Category.query.all()
-
-        cat_dict = {}
-        for cat in categories:
-            cat_dict[cat.id] = cat.type
-
+        cat_dict = {cat.id:cat.type for cat in categories}
+        
+        #FIXME: handle errors
+        
         return jsonify({
             "success": True,
             "categories": cat_dict
         })
 
 
-    '''
-    @TODO: 
-    Create an endpoint to handle GET requests for questions, 
-    including pagination (every 10 questions). 
-    This endpoint should return a list of questions, 
-    number of total questions, current category, categories. 
+    @app.route('/api/questions')
+    def get_questions():
+        questions = Question.query.all()
+        total_questions = len(questions)
 
-    TEST: At this point, when you start the application
-    you should see questions and categories generated,
-    ten questions per page and pagination at the bottom of the screen for three pages.
-    Clicking on the page numbers should update the questions. 
-    '''
+        # q_list = [q.format() for q in questions]  # Unpaginated
+        q_list = paginate(request, questions)
+        
+        categories = Category.query.all()
+        cat_dict = {cat.id:cat.type for cat in categories}
+        
+        # FIXME: handle errors
+
+        return jsonify({
+            'success': True,
+            'questions': q_list,
+            'total_questions': total_questions,
+            'categories': cat_dict,
+            'current_category': None
+        })
+
 
     '''
     @TODO: 
