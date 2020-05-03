@@ -187,7 +187,47 @@ class TriviaTestCase(unittest.TestCase):
         self.assertEqual(len(data['questions']), 1)
         self.assertEqual(data['questions'][0]['id'], 12)
 
+    # For testing the Quiz:
+    # 
+    # We'll test on the Geography category (3), which has 3 questions [13, 14, 15]
+    # 
+    # From Developer Tools, examples of the Request Payload looks like this:
+    # {previous_questions: [], quiz_category: {type: "click", id: 0}} # 0 is ALL
+    # {previous_questions: [], quiz_category: {type: "Art", id: "2"}}
+    # {previous_questions: [17, 16, 18], quiz_category: {type: "Art", id: "2"}}
 
+    def test_play_quiz_1(self):
+        """Tests out the quiz playing functionality"""
+        # Test Quiz when all 3 questions are left
+        res = self.client().post('/api/quizzes', json={"previous_questions": [], "quiz_category": {"type": "Geography", "id": "3"}})
+        data = json.loads(res.data)
+        self.assertEqual(data['success'], True)                 # check success
+        self.assertIsNotNone(data['question'])                  # check question is not blank
+        self.assertEqual(data['question']['category'], 3)       # check correct category
+
+    def test_play_quiz_2(self):
+        """Tests out the quiz playing functionality"""
+        # Test Quiz when 2 of 3 have been asked and only one choice left (15)
+        res = self.client().post('/api/quizzes', json={"previous_questions": [13, 14], "quiz_category": {"type": "Geography", "id": "3"}})
+        data = json.loads(res.data)
+        self.assertEqual(data['success'], True)                 # check success
+        self.assertEqual(data['question']['id'], 15)            # check question 15 returns (only choice left)
+        
+    def test_play_quiz_3(self):
+        """Tests out the quiz playing functionality"""
+        # Test Quiz when no questions are left in category
+        res = self.client().post('/api/quizzes', json={"previous_questions": [13, 14, 15], "quiz_category": {"type": "Geography", "id": "3"}})
+        data = json.loads(res.data)
+        self.assertEqual(data['success'], True)                 # check success
+        self.assertFalse('question' in data)                    # question key isn't in response when no questions left
+
+    def test_play_quiz_4(self):
+        """Tests out the quiz playing functionality"""
+        # Test Quiz with malformed request (category missing).  Should return 400 error.
+        res = self.client().post('/api/quizzes', json={"previous_questions": [13], "quiz_category": {"type": "Geography"}})
+        data = json.loads(res.data)
+        self.assertEqual(data['success'], False)                 # check success is false
+        self.assertEqual(data['error'], 400)                     # error 400, malformed client request
 
 
 # Make the tests conveniently executable

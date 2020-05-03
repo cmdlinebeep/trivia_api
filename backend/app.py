@@ -202,21 +202,77 @@ def create_app(test_config=None):
         })
 
 
+    @app.route('/api/quizzes', methods=['POST'])
+    def play_quiz():
 
+        # From Developer Tools, examples of the Request Payload looks like this:
+        # {previous_questions: [], quiz_category: {type: "click", id: 0}} # 0 is ALL
+        # {previous_questions: [], quiz_category: {type: "Art", id: "2"}}
+        # {previous_questions: [17, 16, 18], quiz_category: {type: "Art", id: "2"}}
 
+        # Get questions of category.  Category 0 is ALL.
+        request_data = request.json
+        try:
+            request_cat = request_data['quiz_category']['id']
+        except:
+            # Category must be supplied in this format
+            abort(400)
 
+        if request_cat == 0:
+            # Get questions from all categories
+            questions = Question.query.all()
+        else:
+            # Get questions for only one category
+            questions = Question.query.filter_by(category=str(request_cat)).all()
 
-    '''
-    @TODO: 
-    Create a POST endpoint to get questions to play the quiz. 
-    This endpoint should take category and previous question parameters 
-    and return a random questions within the given category, 
-    if provided, and that is not one of the previous questions. 
+        # Format the questions
+        questions = [q.format() for q in questions]
+        
+        # print("Questions before filtering:")
+        # for q in questions:
+        #     print(q['id'])
 
-    TEST: In the "Play" tab, after a user selects "All" or a category,
-    one question at a time is displayed, the user is allowed to answer
-    and shown whether they were correct or not. 
-    '''
+        # First prune out the questions from the set that have already been asked.
+        # This is much more performant (with larger datasets) than randomly iterating over and over picking
+        # questions and then testing if they've been asked before.  Can't guarantee maximum latency that way.
+        # For example, could get sequence of several identical random numbers in a row.
+        try:
+            prev_qs = request_data['previous_questions']    # This is a list by id
+        except:
+            # Previous questions must be supplied
+            abort(400)
+        
+        # print("Previous questions:")
+        # print(prev_qs)
+        
+        # Prune the list
+        pruned_qs = []
+        for q in questions:
+            if q['id'] not in prev_qs:
+                pruned_qs.append(q)
+
+        # print("Questions after filtering:")
+        # for q in pruned_qs:
+        #     print(q['id'])
+
+        # Make sure this isn't an empty set (played all the questions)
+        # If we've used al the questions up, return without a question to inform frontend quiz is over.
+        if len(pruned_qs) == 0:
+            return jsonify({
+                'success': True
+            })
+
+        # Otherwise, pick a random question from the pruned set
+        question = random.choice(pruned_qs)
+
+        # print(f'Picked question: {question}')
+
+        # Now return it
+        return jsonify({
+            'success': True,
+            'question': question
+        })
+
 
     '''
     @TODO: 
