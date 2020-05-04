@@ -6,6 +6,7 @@ venv
 *.png
 notes.txt
 *.code-workspace
+*.docx
 frontend/node_modules/
 
 # OS generated files #
